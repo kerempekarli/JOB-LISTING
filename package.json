@@ -2,8 +2,12 @@
   "dependencies": {
     "axios": "^1.7.7",
     "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "fs": "^0.0.1-security",
+    "node-cron": "^3.0.3",
     "pg": "^8.13.0",
     "pg-hstore": "^2.3.4",
+    "puppeteer": "^23.6.0",
     "sequelize": "^6.37.4"
   }
 }

@@ -1,21 +1,21 @@
-const { connectToDatabase, sequelize } = require('./db/sequelize');
-const JobListing = require('./models/JobListing');
-const axios = require('axios');
-const cheerio = require('cheerio');
+const { connectToDatabase, sequelize } = require("./db/sequelize");
+const JobListing = require("./models/JobListing");
+const axios = require("axios");
+const cheerio = require("cheerio");
 
 // Veritabanına bağlan
 connectToDatabase();
 
 // Kaç sayfayı tarayacağımızı belirliyoruz
-const baseURL = 'https://www.kleinanzeigen.de/s-jobs/seite:';
+const baseURL = "https://www.kleinanzeigen.de/s-jobs/seite:";
 const maxPages = 3; // Örnek olarak 3 sayfa tarıyoruz
 
 // İş arayanları ayıklamak için kullanacağımız anahtar kelimeler
 const excludeKeywords = [
-  'Gesuch', // İş arayan
-  'Ich suche Arbeit', // "İş arıyorum"
-  'Job gesucht', // "İş arıyorum"
-  'Suche Job' // "İş arıyorum"
+  "Gesuch", // İş arayan
+  "Ich suche Arbeit", // "İş arıyorum"
+  "Job gesucht", // "İş arıyorum"
+  "Suche Job", // "İş arıyorum"
 ];
 
 // HTML elementlerinden arındırılmış düz metin elde etme fonksiyonu
@@ -32,14 +32,17 @@ async function fetchJobListings(pageNumber) {
     const jobLinks = [];
 
     // <a class="ellipsis"> etiketine sahip bağlantıları seçiyoruz
-    $('a.ellipsis').each((index, element) => {
-      const jobLink = $(element).attr('href');
+    $("a.ellipsis").each((index, element) => {
+      const jobLink = $(element).attr("href");
       jobLinks.push(`https://www.kleinanzeigen.de${jobLink}`); // Tam URL oluşturuyoruz
     });
 
     return jobLinks;
   } catch (error) {
-    console.error(`Error fetching job listings from page ${pageNumber}:`, error);
+    console.error(
+      `Error fetching job listings from page ${pageNumber}:`,
+      error
+    );
     return [];
   }
 }
@@ -52,16 +55,24 @@ async function fetchJobDetails(jobLink) {
     const $ = cheerio.load(html);
 
     // İş ilanı verilerini topluyoruz
-    const jobTitle = $('meta[itemprop="name"]').attr('content');
-    const rawJobDescription = $('meta[itemprop="description"]').attr('content');
+    const jobTitle = $('meta[itemprop="name"]').attr("content");
+    const rawJobDescription = $('meta[itemprop="description"]').attr("content");
     const cleanedDescription = cleanHtml(rawJobDescription); // HTML'den arındırılmış açıklama
     const jobLocation = $('span[itemprop="locality"]').text().trim();
-    const jobDate = $('#viewad-extra-info .icon-calendar-gray-simple').next().text().trim();
-    const jobSalary = $('.addetailslist--detail:contains("Stundenlohn") .addetailslist--detail--value').text().trim();
+    const jobDate = $("#viewad-extra-info .icon-calendar-gray-simple")
+      .next()
+      .text()
+      .trim();
+    const jobSalary = $(
+      '.addetailslist--detail:contains("Stundenlohn") .addetailslist--detail--value'
+    )
+      .text()
+      .trim();
 
     // İş arayan ilanları ayıklamak için anahtar kelimeleri kontrol ediyoruz
-    const isJobAd = !excludeKeywords.some(keyword =>
-      cleanedDescription.toLowerCase().includes(keyword.toLowerCase()) // Hem açıklamayı hem anahtar kelimeleri küçük harfe çeviriyoruz
+    const isJobAd = !excludeKeywords.some(
+      (keyword) =>
+        cleanedDescription.toLowerCase().includes(keyword.toLowerCase()) // Hem açıklamayı hem anahtar kelimeleri küçük harfe çeviriyoruz
     );
 
     if (isJobAd) {
@@ -77,13 +88,13 @@ async function fetchJobDetails(jobLink) {
         });
         console.log(`Veritabanına kaydedildi: ${newJob.title}`);
       } catch (dbError) {
-        console.error('Veritabanına ekleme hatası:', dbError);
+        console.error("Veritabanına ekleme hatası:", dbError);
       }
     } else {
-      console.log('İş arayan ilanı atlandı.');
+      console.log("İş arayan ilanı atlandı.");
     }
   } catch (error) {
-    console.error('Error fetching job details:', error);
+    console.error("Error fetching job details:", error);
   }
 }
 
@@ -105,6 +116,6 @@ async function scrapeJobs() {
 
 // Veritabanı senkronizasyonu yap ve işlemleri başlat
 sequelize.sync({ force: true }).then(() => {
-  console.log('Veritabanı senkronize edildi.');
+  console.log("Veritabanı senkronize edildi.");
   scrapeJobs();
 });
