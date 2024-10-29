@@ -46,17 +46,110 @@ async function collectLinks(page, startIndex) {
   }, startIndex);
 }
 
+async function fetchDetails(page, link) {
+  const detailPage = await page.browser().newPage();
+  await detailPage.goto(link, { waitUntil: "networkidle2" });
+
+  // Verileri topla
+  const details = await detailPage.evaluate(() => {
+    const title =
+      document.querySelector("#detail-kopfbereich-titel")?.innerText ||
+      "Başlık bulunamadı";
+    const publishedDate =
+      document.querySelector("#detail-metalane-veroeffentlicht")?.innerText ||
+      "Yayınlanma tarihi bulunamadı";
+    const availability =
+      document.querySelector("#detail-kopfbereich-verfuegbarkeit")?.innerText ||
+      "Uygunluk bilgisi bulunamadı";
+    const employmentTypes = Array.from(
+      document.querySelectorAll(
+        "#detail-kopfbereich-arbeitszeit-0, #detail-kopfbereich-arbeitszeit-1"
+      )
+    ).map((el) => el.innerText);
+    const location =
+      document.querySelector("#detail-kopfbereich-lokation-0")?.innerText ||
+      "Lokasyon bilgisi bulunamadı";
+    const education =
+      document.querySelector("#detail-lebenslauf-ausbildung-0")?.innerText ||
+      "Eğitim bilgisi bulunamadı";
+    const qualification =
+      document.querySelector("#detail-lebenslauf-abschluss")?.innerText ||
+      "Nitelik bulunamadı";
+
+    const experienceEntries = Array.from(
+      document.querySelectorAll(
+        "#detail-lebenslauf-listenitem-werdegang-0, #detail-lebenslauf-listenitem-werdegang-1"
+      )
+    ).map((entry) => {
+      const dateRange =
+        entry.querySelector(".detailansicht-lebenslauf-listenitem-timespan")
+          ?.innerText || "Tarih bilgisi bulunamadı";
+      const jobTitle =
+        entry.querySelector(
+          ".detailansicht-lebenslauf-listenitem-content-header"
+        )?.innerText || "Pozisyon bilgisi bulunamadı";
+      return { dateRange, jobTitle };
+    });
+
+    const languages = Array.from(
+      document.querySelectorAll("#detail-bewerberdetail-sprachkenntnis-0-0")
+    ).map((lang) => ({
+      language: lang.querySelector("p")?.innerText || "Dil bilgisi bulunamadı",
+      level: lang.nextElementSibling?.innerText || "Seviye bilgisi bulunamadı",
+    }));
+
+    const skills = Array.from(
+      document.querySelectorAll(
+        "#detail-bewerberdetail-kenntnis-2-0-0, #detail-bewerberdetail-kenntnis-1-0-0"
+      )
+    ).map((skill) => skill.innerText);
+
+    return {
+      title,
+      publishedDate,
+      availability,
+      employmentTypes,
+      location,
+      education,
+      qualification,
+      experienceEntries,
+      languages,
+      skills,
+    };
+  });
+
+  console.log(`\n--- İş İlanı Detayları ---
+Başlık: ${details.title}
+Yayınlanma Tarihi: ${details.publishedDate}
+Uygunluk: ${details.availability}
+İstihdam Türleri: ${details.employmentTypes.join(", ")}
+Lokasyon: ${details.location}
+Eğitim: ${details.education}
+Nitelik: ${details.qualification}
+Deneyim:
+${details.experienceEntries
+  .map(
+    (exp) => `  - Tarih Aralığı: ${exp.dateRange}, Pozisyon: ${exp.jobTitle}`
+  )
+  .join("\n")}
+Diller:
+${details.languages
+  .map((lang) => `  - Dil: ${lang.language}, Seviye: ${lang.level}`)
+  .join("\n")}
+Yetenekler: ${details.skills.join(", ")}
+---`);
+
+  await detailPage.close();
+}
+
 async function clickLoadMoreButton(page, nextItemIndex) {
-  // "Load More" düğmesini tekrar tekrar deneyecek bir süre döngüsü ekleyelim
   for (let attempt = 0; attempt < 5; attempt++) {
-    // 5 deneme yapıyoruz
     const loadMoreButton = await page.$("#ergebnisliste-ladeweitere-button");
 
     if (loadMoreButton) {
       await loadMoreButton.evaluate((button) => button.scrollIntoView());
       await loadMoreButton.click();
 
-      // 1 saniyelik bekleme ekliyoruz
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       try {
@@ -69,7 +162,7 @@ async function clickLoadMoreButton(page, nextItemIndex) {
       }
     } else {
       console.log("Load More button not found, retrying...");
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 saniye bekle ve tekrar dene
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
@@ -86,15 +179,20 @@ async function main() {
 
   while (true) {
     const links = await collectLinks(page, startIndex);
-    links.forEach(({ link, index }) => {
-      console.log(`${index + 1}. Link: ${link}`);
-    });
 
-    startIndex += links.length; // Başlangıç indexini topladığımız link sayısına göre güncelle
+    // Her bağlantı için detayları çekiyoruz
+    for (const { link, index } of links) {
+      console.log(`İş İlanı ${index + 1}: ${link}`);
+      await fetchDetails(page, link);
+    }
+
+    startIndex += links.length;
 
     const loadedMore = await clickLoadMoreButton(page, startIndex);
     if (!loadedMore) break;
   }
+
+  await browser.close();
 }
 
 main();
