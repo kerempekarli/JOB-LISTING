@@ -1,6 +1,4 @@
 const puppeteer = require("puppeteer");
-const Arbeitsagentur = require("./models/Arbeitsagentur");
-const { connectToDatabase } = require("./db/sequelize");
 
 async function launchBrowser() {
   return await puppeteer.launch({ headless: false });
@@ -52,6 +50,7 @@ async function fetchDetails(page, link) {
   const detailPage = await page.browser().newPage();
   await detailPage.goto(link, { waitUntil: "networkidle2" });
 
+  // Verileri topla
   const details = await detailPage.evaluate(() => {
     const title =
       document.querySelector("#detail-kopfbereich-titel")?.innerText ||
@@ -119,13 +118,26 @@ async function fetchDetails(page, link) {
     };
   });
 
-  // Veritabanına kaydetme
-  try {
-    await Arbeitsagentur.create(details);
-    console.log("İlan veritabanına başarıyla kaydedildi.");
-  } catch (error) {
-    console.error("İlan kaydedilirken hata oluştu:", error);
-  }
+  console.log(`\n--- İş İlanı Detayları ---
+Başlık: ${details.title}
+Yayınlanma Tarihi: ${details.publishedDate}
+Uygunluk: ${details.availability}
+İstihdam Türleri: ${details.employmentTypes.join(", ")}
+Lokasyon: ${details.location}
+Eğitim: ${details.education}
+Nitelik: ${details.qualification}
+Deneyim:
+${details.experienceEntries
+  .map(
+    (exp) => `  - Tarih Aralığı: ${exp.dateRange}, Pozisyon: ${exp.jobTitle}`
+  )
+  .join("\n")}
+Diller:
+${details.languages
+  .map((lang) => `  - Dil: ${lang.language}, Seviye: ${lang.level}`)
+  .join("\n")}
+Yetenekler: ${details.skills.join(", ")}
+---`);
 
   await detailPage.close();
 }
@@ -159,10 +171,6 @@ async function clickLoadMoreButton(page, nextItemIndex) {
 }
 
 async function main() {
-  console.log("Database initialized");
-  await connectToDatabase(); // Veritabanı bağlantısını başlatıyoruz
-  console.log("Database up!");
-
   const browser = await launchBrowser();
   const page = await openPage(browser);
   await closeCookieModal(page);

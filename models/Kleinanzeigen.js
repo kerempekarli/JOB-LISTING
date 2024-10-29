@@ -2,7 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db/sequelize');
 
 // İş ilanı modelini tanımlıyoruz
-const JobListing = sequelize.define('JobListing', {
+const JobListing = sequelize.define('Kleinanzeigen', {
   title: {
     type: DataTypes.STRING,
     allowNull: false,
